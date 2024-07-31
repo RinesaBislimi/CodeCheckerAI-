@@ -1,0 +1,24 @@
+.github-repo-checker {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  .github-input {
+    width: 50%;
+    padding: 10px;
+    margin-top: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 16px;
+  }
+  
+  .result {
+    margin-top: 20px;
+    text-align: left;
+  }
+  
+  .error {
+    margin-top: 20px;
+    color: red;
+  }
+  
