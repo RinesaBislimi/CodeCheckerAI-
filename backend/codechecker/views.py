@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import CodeSnippetSerializer
 import ast
-from .ml_model import analyze_code  , analyze_github_repo
+from .ml_model import analyze_code  , analyze_github_repo , fetch_repo_contents , analyze_code_contents
 import re
 import tempfile
 import subprocess
@@ -57,16 +57,21 @@ class CodeCheckView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class GithubRepoAnalysisView(APIView):
     def post(self, request):
         repo_url = request.data.get('repo_url', '')
         try:
-            analysis_results = analyze_github_repo(repo_url)
-            return Response(analysis_results, status=status.HTTP_200_OK)
+            repo_info = analyze_github_repo(repo_url)  # Basic repo info
+            code_contents = fetch_repo_contents(repo_url)  # Fetch code files
+            analysis_results = analyze_code_contents(code_contents)  # Analyze code
+            
+            return Response({
+                'repository': repo_info,
+                'analysis_results': analysis_results,
+            }, status=status.HTTP_200_OK)
+            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
     
 def check_code_for_errors(code):
     try:
