@@ -1,0 +1,32 @@
+# Python (Django)
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.log
+local_settings.py
+db.sqlite3
+media/
+venv/
+env/
+ENV/
+.env
+
+# Node.js (React)
+node_modules/
+bower_components/
+build/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.env
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+coverage/
