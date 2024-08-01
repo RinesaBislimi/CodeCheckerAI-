@@ -3,7 +3,6 @@ from django.db import models
 class CodeSnippet(models.Model):
     code = models.TextField()
     result = models.TextField()
-    
 
 class AnalysisResult(models.Model):
     snippet = models.ForeignKey(CodeSnippet, on_delete=models.CASCADE, related_name='analysis_results')

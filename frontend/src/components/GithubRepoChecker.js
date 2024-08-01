@@ -20,18 +20,21 @@ const GithubRepoChecker = () => {
   };
 
   return (
-    <div>
-      <h2>GitHub Repository Checker</h2>
-      <input
-        type="text"
-        value={repoUrl}
-        onChange={(e) => setRepoUrl(e.target.value)}
-        placeholder="Enter GitHub repository URL"
-      />
-      <button onClick={handleCheckRepo}>Check Repository</button>
+    <div className="github-repo-checker">
+      <h2 className="title">GitHub Repository Checker</h2>
+      <div className="input-container">
+        <input
+          className="repo-input"
+          type="text"
+          value={repoUrl}
+          onChange={(e) => setRepoUrl(e.target.value)}
+          placeholder="Enter GitHub repository URL"
+        />
+        <button className="check-button" onClick={handleCheckRepo}>Check Repository</button>
+      </div>
       {result && (
-        <div>
-          <h3>Repository Info:</h3>
+        <div className="result-container">
+          <h3 className="section-title">Repository Info:</h3>
           <p><strong>Repository URL:</strong> {result.repository.repository}</p>
           <p><strong>Name:</strong> {result.repository.name}</p>
           <p><strong>Owner:</strong> {result.repository.owner}</p>
@@ -39,16 +42,39 @@ const GithubRepoChecker = () => {
           <p><strong>Stars:</strong> {result.repository.stars}</p>
           <p><strong>Forks:</strong> {result.repository.forks}</p>
           
-          <h3>Code Analysis Results:</h3>
+          <h3 className="section-title">Code Analysis Results:</h3>
           {Object.keys(result.analysis_results).map((filename) => (
-            <div key={filename}>
-              <h4>{filename}</h4>
-              <p>{result.analysis_results[filename]}</p>
+            <div key={filename} className="analysis-result">
+              <h4 className="filename">{filename}</h4>
+              <p>{result.analysis_results[filename].issue}</p>
+              {result.analysis_results[filename].unused_imports && (
+                <div className="unused-imports">
+                  <p><strong>Unused Imports:</strong></p>
+                  <ul>
+                    {result.analysis_results[filename].unused_imports.map((imp, index) => (
+                      <li key={index}>{imp}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           ))}
+
+          <h3 className="section-title">Security Vulnerability Detection:</h3>
+          {result.security_vulnerabilities && result.security_vulnerabilities.length > 0 ? (
+            result.security_vulnerabilities.map((vulnerability, index) => (
+              <div key={index} className="vulnerability">
+                <p><strong>Vulnerability:</strong> {vulnerability.issue}</p>
+                <p><strong>Description:</strong> {vulnerability.description}</p>
+                <p><strong>Severity:</strong> {vulnerability.severity}</p>
+              </div>
+            ))
+          ) : (
+            <p>No vulnerabilities detected.</p>
+          )}
         </div>
       )}
-      {error && <div style={{ color: 'red' }}><p>{error}</p></div>}
+      {error && <div className="error-message"><p>{error}</p></div>}
     </div>
   );
 };

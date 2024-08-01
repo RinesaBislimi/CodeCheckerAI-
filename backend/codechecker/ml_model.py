@@ -96,3 +96,16 @@ def analyze_code_contents(code_contents):
             analysis_results[filename] = "No issues detected."
     
     return analysis_results
+
+
+def detect_security_vulnerabilities(code_contents):
+
+    vulnerabilities = []
+    for filename, code in code_contents.items():
+        if "eval(" in code:
+            vulnerabilities.append({
+                'issue': 'Use of eval()',
+                'description': 'The use of eval() is dangerous as it can execute arbitrary code.',
+                'severity': 'High'
+            })
+    return vulnerabilities
