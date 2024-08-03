@@ -1,58 +1,38 @@
 import ast
-import re
-import tempfile
 from rest_framework.views import APIView
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from django.http import JsonResponse
-from .serializers import CodeSnippetSerializer
+import pandas as pd
+from sklearn.ensemble import IsolationForest
+import pandas as pd
+from sklearn.ensemble import IsolationForest
+import numpy as np
 from rest_framework.views import APIView
+from rest_framework import status
+from rest_framework.response import Response
+import pandas as pd
+from sklearn.ensemble import IsolationForest
+import matplotlib.pyplot as plt
+import logging
+
+import io
+import base64
+import numpy as np
 from .ml_model import (
     analyze_code,
     analyze_github_repo,
     fetch_repo_contents,
     analyze_code_contents,
     detect_security_vulnerabilities,
+    detect_code_clones,
+    detect_code_clusters,
+    extract_keywords_from_code,
+    detect_code_smells,
+    detect_deprecated_libraries,
+    detect_anomalies
 )
-
-
-def find_unused_imports(code):
-    """
-    Detect unused imports in the given code string.
-    """
-    try:
-        tree = ast.parse(code)
-        imports = [node for node in ast.walk(tree) if isinstance(node, ast.Import)]
-        import_froms = [node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
-        all_imports = imports + import_froms
-
-        used_names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
-
-        unused_imports = []
-
-        for node in all_imports:
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.asname:
-                        if alias.asname not in used_names:
-                            unused_imports.append(alias.asname)
-                    else:
-                        if alias.name.split('.')[0] not in used_names:
-                            unused_imports.append(alias.name)
-            elif isinstance(node, ast.ImportFrom):
-                for alias in node.names:
-                    if alias.asname:
-                        if alias.asname not in used_names:
-                            unused_imports.append(alias.asname)
-                    else:
-                        if alias.name not in used_names:
-                            unused_imports.append(alias.name)
-
-        return unused_imports
-
-    except Exception as e:
-        return [f"Error analyzing imports: {e}"]
+from .utils import find_unused_imports, remove_unused_imports  # Import from utils
 
 class CodeSnippetSerializer(serializers.Serializer):
     code = serializers.CharField()
@@ -64,59 +44,35 @@ class CodeCheckView(APIView):
         serializer = CodeSnippetSerializer(data=request.data)
         if serializer.is_valid():
             code = serializer.validated_data.get("code")
-            
-            # Initialize results
-            result = "No syntax errors detected."
-            unused_imports = []
 
-            # Check for syntax errors
             try:
                 ast.parse(code)
             except SyntaxError as e:
-                result = f"Syntax Error: {e}"
-                return Response({
-                    "result": result,
-                    "unused_imports": unused_imports,
-                    "corrected_code": ""
-                }, status=status.HTTP_200_OK)
-            
-            # Check for unused imports
+                return Response({"result": f"Syntax Error: {e}"}, status=status.HTTP_200_OK)
+
             unused_imports = find_unused_imports(code)
-            if unused_imports:
-                result = "Code contains unused imports."
+            anomaly_detection_result = detect_anomalies([code])
+            code_clones = detect_code_clones([code, code])
+            keywords = extract_keywords_from_code(code)
+            code_smells = detect_code_smells(code)
+            deprecated_libraries = detect_deprecated_libraries(code)
+            clusters = detect_code_clusters([code, code])
 
-            # Replace placeholder
-            corrected_code = re.sub(r'print\(([^f"]+)"', r'print(f"\1{"{PLACEHOLDER}"}")', code)
-
-            return Response({
-                "result": result,
+            response_data = {
+                "result": "No syntax errors detected.",
                 "unused_imports": unused_imports,
-                "corrected_code": corrected_code
-                 }, status=status.HTTP_200_OK)
+                "corrected_code": remove_unused_imports(code),
+                "anomaly_detection_result": anomaly_detection_result,
+                "keywords": keywords,
+                "code_smells": code_smells,
+                "deprecated_libraries": deprecated_libraries,
+                "code_clones": code_clones,
+                "clusters": clusters,
+            }
 
+            return Response(response_data, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-def analyze_code_contents(code_contents):
-    """
-    Analyze the contents of the code files and detect issues such as unused imports.
-    """
-    analysis_results = {}
-
-    for filename, code in code_contents.items():
-        if filename.endswith('.py'):
-            unused_imports = find_unused_imports(code)
-            if unused_imports:
-                analysis_results[filename] = {
-                    "issue": "Contains import statements. Check for unused imports.",
-                    "unused_imports": unused_imports
-                }
-            else:
-                analysis_results[filename] = {"issue": "No issues detected."}
-        else:
-            analysis_results[filename] = {"issue": "No issues detected."}
-
-    return analysis_results
 
 
 class CodeAnalysisView(APIView):
@@ -127,7 +83,6 @@ class CodeAnalysisView(APIView):
         visualization_type = request.data.get('visualization_type', 'bar')
         analysis_results = analyze_code(code, visualization_type)
         return Response(analysis_results, status=status.HTTP_200_OK)
-
 
 class GithubRepoAnalysisView(APIView):
     permission_classes = [AllowAny]
@@ -148,11 +103,62 @@ class GithubRepoAnalysisView(APIView):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+        
+        
+class DatasetCheckView(APIView):
+    def post(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
 
-# Utility function for checking code errors
-def check_code_for_errors(code):
-    try:
-        ast.parse(code)
-        return "No syntax errors detected."
-    except SyntaxError as e:
-        return f"Syntax Error: {e}"
+        try:
+            # Load dataset into a DataFrame
+            df = pd.read_csv(file)
+
+            # Check for numeric features
+            numeric_features = df.select_dtypes(include=[np.number])
+            if numeric_features.empty:
+                return Response({'error': 'Dataset does not contain numeric features for anomaly detection.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            features = numeric_features.values
+            
+            # Anomaly detection using Isolation Forest
+            model = IsolationForest(contamination=0.1)
+            model.fit(features)
+            predictions = model.predict(features)
+            
+            # Identify anomalies
+            anomalies = np.where(predictions == -1)[0]
+            num_anomalies = len(anomalies)
+            
+            # Generate a graph
+            plt.figure(figsize=(10, 6))
+            plt.scatter(range(len(features)), features[:, 0], c='blue', label='Normal')
+            plt.scatter(anomalies, features[anomalies, 0], c='red', label='Anomaly')
+            plt.title('Anomaly Detection')
+            plt.xlabel('Index')
+            plt.ylabel('Feature Value')
+            plt.legend()
+            plt.grid(True)
+            
+            # Save plot to a BytesIO object
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+            buf.close()
+            
+            return Response({
+                'num_anomalies': num_anomalies,
+                'anomalies': anomalies.tolist(),
+                'anomaly_graph': img_str  # Include the base64-encoded image here
+            })
+
+        except pd.errors.EmptyDataError:
+            return Response({'error': 'Uploaded file is empty. Please upload a non-empty CSV file.'}, status=status.HTTP_400_BAD_REQUEST)
+        except pd.errors.ParserError:
+            return Response({'error': 'Error parsing the file. Please ensure the file is a valid CSV format.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': f'An unexpected error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

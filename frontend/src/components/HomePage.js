@@ -15,6 +15,10 @@ const HomePage = () => {
           <h2>Check GitHub Repo</h2>
           <p>Analyze an entire GitHub repository for code quality and issues.</p>
         </Link>
+        <Link to="/check-dataset" className="option-card">
+          <h2>Check Dataset</h2>
+          <p>Detect anomalies in your dataset using machine learning algorithms.</p>
+        </Link>
       </div>
     </div>
   );
