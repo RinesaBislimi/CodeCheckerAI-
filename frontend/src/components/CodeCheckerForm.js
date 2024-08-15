@@ -42,7 +42,7 @@ const CodeCheckerForm = () => {
   };
 
   return (
-     <div className="code-checker">
+    <div className="code-checker">
       <h1 className="header">Code Checker</h1>
       <form onSubmit={handleSubmit}>
         <div className="code-input">
