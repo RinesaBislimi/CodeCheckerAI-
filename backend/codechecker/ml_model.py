@@ -316,3 +316,26 @@ def detect_anomalies(user_code):
         return 'No anomalies detected.'
     
     
+
+def correct_syntax_errors(code):
+    """
+    Attempt to correct basic syntax errors in the provided code.
+    
+    Parameters:
+    - code (str): The code with potential syntax errors.
+    
+    Returns:
+    - corrected_code (str): The code after attempting corrections.
+    """
+    corrected_code = code
+    
+    # Example correction: Close any open parentheses
+    open_parens = corrected_code.count('(')
+    close_parens = corrected_code.count(')')
+    
+    if open_parens > close_parens:
+        corrected_code += ')' * (open_parens - close_parens)
+    
+    # You can add more rules here for other common syntax issues
+    
+    return corrected_code

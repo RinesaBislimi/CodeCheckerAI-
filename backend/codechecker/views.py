@@ -33,35 +33,88 @@ from .ml_model import (
     detect_anomalies
 )
 from .utils import find_unused_imports, remove_unused_imports  # Import from utils
-
-class CodeSnippetSerializer(serializers.Serializer):
-    code = serializers.CharField()
+from .serializers import CodeSnippetSerializer
 
 class CodeCheckView(APIView):
     permission_classes = [AllowAny]
+
+    def correct_syntax_errors(self, code):
+        try:
+            ast.parse(code)
+            return code, None  # No errors, return the original code
+        except SyntaxError as e:
+            lines = code.split('\n')
+            error_line_number = e.lineno - 1  # Error line index (0-based)
+            error_line = lines[error_line_number]
+
+            correction_message = None
+
+            # Example fix: Check for missing closing parenthesis
+            if error_line.count('(') > error_line.count(')'):
+                lines[error_line_number] = error_line + ')'
+                correction_message = "Added missing closing parenthesis."
+
+            # Example fix: Check for missing closing bracket
+            elif error_line.count('[') > error_line.count(']'):
+                lines[error_line_number] = error_line + ']'
+                correction_message = "Added missing closing bracket."
+
+            # Example fix: Check for missing closing brace
+            elif error_line.count('{') > error_line.count('}'):
+                lines[error_line_number] = error_line + '}'
+                correction_message = "Added missing closing brace."
+
+            # Example fix: Check for missing colon at the end of control structures
+            elif any(error_line.strip().endswith(keyword) for keyword in ('if', 'elif', 'else', 'for', 'while', 'def', 'class')):
+                if not error_line.strip().endswith(':'):
+                    lines[error_line_number] = error_line + ':'
+                    correction_message = "Added missing colon at the end of the statement."
+
+            # Example fix: Check for missing quotation mark
+            elif error_line.count('"') % 2 != 0:
+                lines[error_line_number] = error_line + '"'
+                correction_message = "Added missing double quotation mark."
+            elif error_line.count("'") % 2 != 0:
+                lines[error_line_number] = error_line + "'"
+                correction_message = "Added missing single quotation mark."
+
+            else:
+                # If no automatic fix can be applied, return the original code with an error message
+                return code, f"Syntax Error: {e}"
+
+            corrected_code = '\n'.join(lines)
+            return corrected_code, correction_message
 
     def post(self, request, *args, **kwargs):
         serializer = CodeSnippetSerializer(data=request.data)
         if serializer.is_valid():
             code = serializer.validated_data.get("code")
 
+            # Correct syntax errors if possible
+            corrected_code, correction_message = self.correct_syntax_errors(code)
+
+            # Check for remaining syntax errors after correction
             try:
-                ast.parse(code)
+                ast.parse(corrected_code)
             except SyntaxError as e:
                 return Response({"result": f"Syntax Error: {e}"}, status=status.HTTP_200_OK)
 
-            unused_imports = find_unused_imports(code)
-            anomaly_detection_result = detect_anomalies([code])
-            code_clones = detect_code_clones([code, code])
-            keywords = extract_keywords_from_code(code)
-            code_smells = detect_code_smells(code)
-            deprecated_libraries = detect_deprecated_libraries(code)
-            clusters = detect_code_clusters([code, code])
+            # Now remove unused imports from the corrected code
+            corrected_code = remove_unused_imports(corrected_code)
+
+            # Analyze the code using various functions
+            unused_imports = find_unused_imports(corrected_code)
+            anomaly_detection_result = detect_anomalies([corrected_code])
+            code_clones = detect_code_clones([corrected_code, corrected_code])
+            keywords = extract_keywords_from_code(corrected_code)
+            code_smells = detect_code_smells(corrected_code)
+            deprecated_libraries = detect_deprecated_libraries(corrected_code)
+            clusters = detect_code_clusters([corrected_code, corrected_code])
 
             response_data = {
-                "result": "No syntax errors detected.",
+                "result": correction_message if correction_message else "No syntax errors detected.",
                 "unused_imports": unused_imports,
-                "corrected_code": remove_unused_imports(code),
+                "corrected_code": corrected_code,  # Now includes both syntax corrections and removal of unused imports
                 "anomaly_detection_result": anomaly_detection_result,
                 "keywords": keywords,
                 "code_smells": code_smells,
@@ -73,7 +126,7 @@ class CodeCheckView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 
 class CodeAnalysisView(APIView):
     permission_classes = [AllowAny]
