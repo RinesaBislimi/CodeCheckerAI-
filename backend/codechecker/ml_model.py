@@ -3,15 +3,12 @@ import requests
 import re
 from sklearn.ensemble import IsolationForest
 import numpy as np
-from sklearn.feature_extraction.text import CountVectorizer
-from collections import Counter
-
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
 from sklearn.svm import OneClassSVM
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from collections import Counter
 from .utils import remove_unused_imports
 
 def preprocess_code_for_analysis(code):
@@ -20,6 +17,7 @@ def preprocess_code_for_analysis(code):
     """
     cleaned_code = remove_unused_imports(code)
     return cleaned_code
+
 def analyze_code_snippets(code_snippets):
     """
     Analyze code snippets by first cleaning them and then performing various analyses.
@@ -38,8 +36,10 @@ def analyze_code_snippets(code_snippets):
     
     return [cleaned_snippets[i] for i, anomaly in enumerate(anomalies) if anomaly == -1]
 
-
 def reduce_features_with_pca(code_snippets, n_components=2):
+    """
+    Reduce feature dimensionality using PCA.
+    """
     features = [extract_features_from_code(code) for code in code_snippets]
     features = np.array(features)
     
@@ -48,8 +48,10 @@ def reduce_features_with_pca(code_snippets, n_components=2):
     
     return reduced_features
 
-
 def detect_code_clusters(code_snippets, n_clusters=5):
+    """
+    Detect clusters in code snippets using KMeans.
+    """
     features = [extract_features_from_code(code) for code in code_snippets]
     features = np.array(features)
     
@@ -70,8 +72,6 @@ def detect_code_clusters(code_snippets, n_clusters=5):
         'cluster_centers': cluster_centers,
     }
 
-
-
 # def detect_anomalies_with_svm(code_snippets):
 #     features = [extract_features_from_code(code) for code in code_snippets]
 #     features = np.array(features)
@@ -82,8 +82,6 @@ def detect_code_clusters(code_snippets, n_clusters=5):
 #     anomalies = model.predict(features)
     
 #     return [code_snippets[i] for i, anomaly in enumerate(anomalies) if anomaly == -1]
-
-
 
 def compute_code_embeddings(code_snippets):
     """
@@ -112,14 +110,18 @@ def detect_code_clones(code_snippets, threshold=0.9):
                 })
     return clones
 
-
 def extract_keywords_from_code(code):
+    """
+    Extract keywords from a single code snippet.
+    """
     vectorizer = CountVectorizer(stop_words='english')
     X = vectorizer.fit_transform([code])
     return vectorizer.get_feature_names_out()
 
-
 def detect_code_smells(code):
+    """
+    Detect code smells in a single code snippet.
+    """
     lines = code.splitlines()
     metrics = {
         'line_count': len(lines),
@@ -137,10 +139,12 @@ def detect_code_smells(code):
 
     return smells
 
-
 DEPRECATED_LIBRARIES = {'oldlib': '1.0.0'}
 
 def detect_deprecated_libraries(code):
+    """
+    Detect deprecated libraries used in the code.
+    """
     deprecated = []
     for lib, version in DEPRECATED_LIBRARIES.items():
         if lib in code:
@@ -151,15 +155,13 @@ def detect_deprecated_libraries(code):
             })
     return deprecated
 
-
-
 def analyze_code(code, visualization_type):
-    # Extract keywords from the code
+    """
+    Analyze a single code snippet and prepare data for visualization.
+    """
     keywords = re.findall(r'\b\w+\b', code)
-    # Count the frequency of each keyword
     keyword_counts = Counter(keywords)
     
-    # Prepare analysis results
     labels = list(keyword_counts.keys())
     data = list(keyword_counts.values())
     
@@ -168,9 +170,10 @@ def analyze_code(code, visualization_type):
         'data': data,
     }
 
-
 def analyze_github_repo(repo_url):
-    # Regular expression to match GitHub repository URL in various formats
+    """
+    Analyze a GitHub repository by fetching and returning relevant data.
+    """
     pattern = re.compile(r'^https://github\.com/([^/]+)/([^/]+)(?:\.git)?$', re.IGNORECASE)
     match = pattern.match(repo_url)
     
@@ -179,16 +182,13 @@ def analyze_github_repo(repo_url):
     
     owner, repo = match.groups()
     
-    # Construct the GitHub API URL
     api_url = f'https://api.github.com/repos/{owner}/{repo}'
     
     try:
-        # Fetch repository information
         response = requests.get(api_url)
-        response.raise_for_status()  # Check if request was successful
+        response.raise_for_status()
         repo_data = response.json()
         
-        # Extract and return relevant repository data
         analysis_result = {
             'repository': repo_url,
             'name': repo_data.get('name', 'No name available'),
@@ -202,10 +202,11 @@ def analyze_github_repo(repo_url):
     
     except requests.RequestException as e:
         raise ValueError(f"Error fetching repository data: {e}")
-    
-    
+
 def fetch_repo_contents(repo_url):
-    # Extract owner and repo from the URL
+    """
+    Fetch the contents of a GitHub repository.
+    """
     pattern = re.compile(r'https://github\.com/([^/]+)/([^/]+)', re.IGNORECASE)
     match = pattern.match(repo_url)
     
@@ -214,15 +215,13 @@ def fetch_repo_contents(repo_url):
     
     owner, repo = match.groups()
     
-    # GitHub API URL for repository contents
     api_url = f'https://api.github.com/repos/{owner}/{repo}/contents'
     
     try:
         response = requests.get(api_url)
-        response.raise_for_status()  # Check if request was successful
+        response.raise_for_status()
         contents = response.json()
         
-        # Extract file content from the response
         files = [item for item in contents if item['type'] == 'file']
         file_contents = {}
         
@@ -235,15 +234,14 @@ def fetch_repo_contents(repo_url):
     
     except requests.RequestException as e:
         raise ValueError(f"Error fetching repository contents: {e}")
-    
-    
-    
+
 def analyze_code_contents(code_contents):
-    # Example analysis function
+    """
+    Analyze the contents of code files from a repository.
+    """
     analysis_results = {}
     
     for filename, content in code_contents.items():
-        # Perform static code analysis (e.g., linting, syntax checks)
         if 'import' in content:
             analysis_results[filename] = "Contains import statements. Check for unused imports."
         else:
@@ -251,9 +249,10 @@ def analyze_code_contents(code_contents):
     
     return analysis_results
 
-
 def detect_security_vulnerabilities(code_contents):
-
+    """
+    Detect security vulnerabilities in code contents.
+    """
     vulnerabilities = []
     for filename, code in code_contents.items():
         if "eval(" in code:
@@ -264,78 +263,57 @@ def detect_security_vulnerabilities(code_contents):
             })
     return vulnerabilities
 
-
-
-def extract_features_from_code(code):
+def extract_features_from_code(code: str) -> dict:
     """
-    Basic feature extraction function for code.
-    For demonstration purposes, this function calculates simple features such as the number of lines and the length of each line.
-    
-    Parameters:
-    - code (str): The code to extract features from.
-    
-    Returns:
-    - features (list): A list of features extracted from the code.
+    Extract features from the code snippet.
     """
-    if isinstance(code, list):
-        code = "\n".join(code)  # Join list items into a single string
+    if not isinstance(code, str):
+        raise TypeError("Expected code to be a string.")
     
-    lines = code.split('\n')
-    num_lines = len(lines)
-    line_lengths = [len(line) for line in lines]
+    num_lines = len(code.split('\n'))
+    line_lengths = [len(line) for line in code.split('\n')]
     avg_line_length = np.mean(line_lengths) if line_lengths else 0
+    num_imports = code.count('import ')
+    num_functions = code.count('def ')
     
-    return [num_lines, avg_line_length]
+    return [num_lines, avg_line_length, num_imports, num_functions]
 
 def detect_anomalies(user_code):
     """
-    Detect anomalies in the provided code using Isolation Forest.
-    
-    Parameters:
-    - user_code (str): The code provided by the user.
-    
-    Returns:
-    - result (str): Message indicating whether the code contains anomalies.
+    Detect anomalies in code using Isolation Forest.
     """
+    if isinstance(user_code, list):
+        user_code = '\n'.join(user_code)
     
-    # Extract features from the provided code
+    # Ensure that user_code is a string
+    if not isinstance(user_code, str):
+        raise TypeError("user_code should be a string or a list of strings.")
+    
     features = extract_features_from_code(user_code)
     features = np.array([features])
     
-    # Initialize IsolationForest model
     model = IsolationForest(contamination=0.1)
     model.fit(features)
     
-    # Predict anomaly
-    anomaly = model.predict(features)[0]
+    anomaly = model.predict(features)
     
-    # Determine and return result
-    if anomaly == -1:
-        return 'Anomaly detected in the code.'
-    else:
-        return 'No anomalies detected.'
-    
-    
+    return anomaly[0] == -1
 
-def correct_syntax_errors(code):
+def detect_code_clones(code_snippets):
     """
-    Attempt to correct basic syntax errors in the provided code.
-    
-    Parameters:
-    - code (str): The code with potential syntax errors.
-    
-    Returns:
-    - corrected_code (str): The code after attempting corrections.
+    Detect code clones by comparing the similarity of code snippets.
     """
-    corrected_code = code
-    
-    # Example correction: Close any open parentheses
-    open_parens = corrected_code.count('(')
-    close_parens = corrected_code.count(')')
-    
-    if open_parens > close_parens:
-        corrected_code += ')' * (open_parens - close_parens)
-    
-    # You can add more rules here for other common syntax issues
-    
-    return corrected_code
+    embeddings = compute_code_embeddings(code_snippets)
+    similarity_matrix = cosine_similarity(embeddings)
+
+    clones = []
+    num_snippets = len(code_snippets)
+    for i in range(num_snippets):
+        for j in range(i + 1, num_snippets):
+            if similarity_matrix[i, j] > 0.9:
+                clones.append({
+                    'snippet1': code_snippets[i],
+                    'snippet2': code_snippets[j],
+                    'similarity': similarity_matrix[i, j]
+                })
+    return clones

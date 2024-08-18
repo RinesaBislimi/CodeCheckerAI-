@@ -39,9 +39,12 @@ class CodeCheckView(APIView):
     permission_classes = [AllowAny]
 
     def correct_syntax_errors(self, code):
+        """
+        Attempts to correct common syntax errors in the provided code.
+        """
         try:
             ast.parse(code)
-            return code, None  # No errors, return the original code
+            return code, None  # No syntax errors found
         except SyntaxError as e:
             lines = code.split('\n')
             error_line_number = e.lineno - 1  # Error line index (0-based)
@@ -49,34 +52,50 @@ class CodeCheckView(APIView):
 
             correction_message = None
 
-            # Example fix: Check for missing closing parenthesis
+            # Fix: Missing closing parenthesis
             if error_line.count('(') > error_line.count(')'):
                 lines[error_line_number] = error_line + ')'
                 correction_message = "Added missing closing parenthesis."
 
-            # Example fix: Check for missing closing bracket
+            # Fix: Missing closing bracket
             elif error_line.count('[') > error_line.count(']'):
                 lines[error_line_number] = error_line + ']'
                 correction_message = "Added missing closing bracket."
 
-            # Example fix: Check for missing closing brace
+            # Fix: Missing closing brace
             elif error_line.count('{') > error_line.count('}'):
                 lines[error_line_number] = error_line + '}'
                 correction_message = "Added missing closing brace."
 
-            # Example fix: Check for missing colon at the end of control structures
-            elif any(error_line.strip().endswith(keyword) for keyword in ('if', 'elif', 'else', 'for', 'while', 'def', 'class')):
+            # Fix: Missing colon at the end of control structures (if, elif, else, for, while, def, class)
+            elif any(error_line.strip().startswith(keyword) for keyword in ('if', 'elif', 'else', 'for', 'while', 'def', 'class')):
                 if not error_line.strip().endswith(':'):
                     lines[error_line_number] = error_line + ':'
                     correction_message = "Added missing colon at the end of the statement."
 
-            # Example fix: Check for missing quotation mark
+            # Fix: Missing quotation mark (double or single)
             elif error_line.count('"') % 2 != 0:
                 lines[error_line_number] = error_line + '"'
                 correction_message = "Added missing double quotation mark."
             elif error_line.count("'") % 2 != 0:
                 lines[error_line_number] = error_line + "'"
                 correction_message = "Added missing single quotation mark."
+
+            # Fix: Indentation errors (e.g., expected an indented block)
+            elif 'expected an indented block' in str(e):
+                indentation_level = len(error_line) - len(error_line.lstrip())
+                lines.insert(error_line_number + 1, ' ' * (indentation_level + 4) + 'pass')
+                correction_message = "Added 'pass' statement to fix indentation."
+
+            # Fix: Unexpected EOF while parsing (e.g., incomplete statements or blocks)
+            elif 'unexpected EOF while parsing' in str(e):
+                lines[error_line_number] = error_line + '\npass'
+                correction_message = "Added 'pass' to complete the statement."
+
+            # Fix: Assignments without expressions
+            elif 'cannot assign to' in str(e) and error_line.strip().endswith('='):
+                lines[error_line_number] = error_line + ' None'
+                correction_message = "Added 'None' to complete the assignment."
 
             else:
                 # If no automatic fix can be applied, return the original code with an error message
@@ -98,12 +117,14 @@ class CodeCheckView(APIView):
                 ast.parse(corrected_code)
             except SyntaxError as e:
                 return Response({"result": f"Syntax Error: {e}"}, status=status.HTTP_200_OK)
+            
+            # List unused imports
+            unused_imports = find_unused_imports(corrected_code)
 
             # Now remove unused imports from the corrected code
             corrected_code = remove_unused_imports(corrected_code)
 
             # Analyze the code using various functions
-            unused_imports = find_unused_imports(corrected_code)
             anomaly_detection_result = detect_anomalies([corrected_code])
             code_clones = detect_code_clones([corrected_code, corrected_code])
             keywords = extract_keywords_from_code(corrected_code)
@@ -113,7 +134,7 @@ class CodeCheckView(APIView):
 
             response_data = {
                 "result": correction_message if correction_message else "No syntax errors detected.",
-                "unused_imports": unused_imports,
+                "unused_imports": unused_imports,  # Listing unused imports
                 "corrected_code": corrected_code,  # Now includes both syntax corrections and removal of unused imports
                 "anomaly_detection_result": anomaly_detection_result,
                 "keywords": keywords,
@@ -126,6 +147,7 @@ class CodeCheckView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     
 
 class CodeAnalysisView(APIView):

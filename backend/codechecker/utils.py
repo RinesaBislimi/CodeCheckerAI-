@@ -36,6 +36,7 @@ def find_unused_imports(code):
 
     except Exception as e:
         return [f"Error analyzing imports: {e}"]
+    
 
 def remove_unused_imports(code):
     """
