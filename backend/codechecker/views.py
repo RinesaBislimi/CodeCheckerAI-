@@ -32,7 +32,7 @@ from .ml_model import (
     detect_deprecated_libraries,
     detect_anomalies
 )
-from .utils import find_unused_imports, remove_unused_imports  # Import from utils
+from .utils import find_unused_imports, remove_unused_imports  
 from .serializers import CodeSnippetSerializer
 
 class CodeCheckView(APIView):
@@ -42,67 +42,74 @@ class CodeCheckView(APIView):
         """
         Attempts to correct common syntax errors in the provided code.
         """
-        try:
-            ast.parse(code)
-            return code, None  # No syntax errors found
-        except SyntaxError as e:
-            lines = code.split('\n')
-            error_line_number = e.lineno - 1  # Error line index (0-based)
-            error_line = lines[error_line_number]
+        correction_message = None
+        max_iterations = 10  
 
-            correction_message = None
+        for _ in range(max_iterations):
+            try:
+                ast.parse(code)
+                return code, correction_message  
+            except SyntaxError as e:
+                lines = code.split('\n')
+                error_line_number = e.lineno - 1  
+                error_line = lines[error_line_number]
 
-            # Fix: Missing closing parenthesis
-            if error_line.count('(') > error_line.count(')'):
-                lines[error_line_number] = error_line + ')'
-                correction_message = "Added missing closing parenthesis."
+                new_correction_message = None
 
-            # Fix: Missing closing bracket
-            elif error_line.count('[') > error_line.count(']'):
-                lines[error_line_number] = error_line + ']'
-                correction_message = "Added missing closing bracket."
+               
+                if error_line.count('(') > error_line.count(')'):
+                    lines[error_line_number] = error_line + ')'
+                    new_correction_message = "Added missing closing parenthesis."
 
-            # Fix: Missing closing brace
-            elif error_line.count('{') > error_line.count('}'):
-                lines[error_line_number] = error_line + '}'
-                correction_message = "Added missing closing brace."
+                # Fix: Missing closing bracket
+                elif error_line.count('[') > error_line.count(']'):
+                    lines[error_line_number] = error_line + ']'
+                    new_correction_message = "Added missing closing bracket."
 
-            # Fix: Missing colon at the end of control structures (if, elif, else, for, while, def, class)
-            elif any(error_line.strip().startswith(keyword) for keyword in ('if', 'elif', 'else', 'for', 'while', 'def', 'class')):
-                if not error_line.strip().endswith(':'):
-                    lines[error_line_number] = error_line + ':'
-                    correction_message = "Added missing colon at the end of the statement."
+                # Fix: Missing closing brace
+                elif error_line.count('{') > error_line.count('}'):
+                    lines[error_line_number] = error_line + '}'
+                    new_correction_message = "Added missing closing brace."
 
-            # Fix: Missing quotation mark (double or single)
-            elif error_line.count('"') % 2 != 0:
-                lines[error_line_number] = error_line + '"'
-                correction_message = "Added missing double quotation mark."
-            elif error_line.count("'") % 2 != 0:
-                lines[error_line_number] = error_line + "'"
-                correction_message = "Added missing single quotation mark."
+                # Fix: Missing colon at the end of control structures
+                elif any(error_line.strip().startswith(keyword) for keyword in ('if', 'elif', 'else', 'for', 'while', 'def', 'class')):
+                    if not error_line.strip().endswith(':'):
+                        lines[error_line_number] = error_line + ':'
+                        new_correction_message = "Added missing colon at the end of the statement."
 
-            # Fix: Indentation errors (e.g., expected an indented block)
-            elif 'expected an indented block' in str(e):
-                indentation_level = len(error_line) - len(error_line.lstrip())
-                lines.insert(error_line_number + 1, ' ' * (indentation_level + 4) + 'pass')
-                correction_message = "Added 'pass' statement to fix indentation."
+                # Fix: Missing quotation mark (double or single)
+                elif error_line.count('"') % 2 != 0:
+                    lines[error_line_number] = error_line + '"'
+                    new_correction_message = "Added missing double quotation mark."
+                elif error_line.count("'") % 2 != 0:
+                    lines[error_line_number] = error_line + "'"
+                    new_correction_message = "Added missing single quotation mark."
 
-            # Fix: Unexpected EOF while parsing (e.g., incomplete statements or blocks)
-            elif 'unexpected EOF while parsing' in str(e):
-                lines[error_line_number] = error_line + '\npass'
-                correction_message = "Added 'pass' to complete the statement."
+                # Fix: Indentation errors
+                elif 'expected an indented block' in str(e):
+                    indentation_level = len(error_line) - len(error_line.lstrip())
+                    lines.insert(error_line_number + 1, ' ' * (indentation_level + 4) + 'pass')
+                    new_correction_message = "Added 'pass' statement to fix indentation."
 
-            # Fix: Assignments without expressions
-            elif 'cannot assign to' in str(e) and error_line.strip().endswith('='):
-                lines[error_line_number] = error_line + ' None'
-                correction_message = "Added 'None' to complete the assignment."
+                # Fix: Unexpected EOF while parsing
+                elif 'unexpected EOF while parsing' in str(e):
+                    lines[error_line_number] = error_line + '\npass'
+                    new_correction_message = "Added 'pass' to complete the statement."
 
-            else:
-                # If no automatic fix can be applied, return the original code with an error message
-                return code, f"Syntax Error: {e}"
+                # Fix: Assignments without expressions
+                elif 'cannot assign to' in str(e) and error_line.strip().endswith('='):
+                    lines[error_line_number] = error_line + ' None'
+                    new_correction_message = "Added 'None' to complete the assignment."
 
-            corrected_code = '\n'.join(lines)
-            return corrected_code, correction_message
+                else:
+                    # If no automatic fix can be applied, return the original code with an error message
+                    return code, f"Syntax Error: {e}"
+
+                code = '\n'.join(lines)
+                correction_message = (correction_message or "") + " " + new_correction_message
+
+        # If maximum iterations are reached, return the current state of the code
+        return code, correction_message or "Reached maximum iterations, some errors might still be present."
 
     def post(self, request, *args, **kwargs):
         serializer = CodeSnippetSerializer(data=request.data)
