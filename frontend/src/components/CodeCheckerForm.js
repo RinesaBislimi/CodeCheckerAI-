@@ -12,6 +12,8 @@ const CodeCheckerForm = () => {
   const [codeSmells, setCodeSmells] = useState([]);
   const [deprecatedLibraries, setDeprecatedLibraries] = useState([]);
   const [codeClones, setCodeClones] = useState([]);
+  const [keywordChart, setKeywordChart] = useState(''); // New state for the keyword chart
+  const [codeCloneHeatmap, setCodeCloneHeatmap] = useState(''); // New state for the code clones heatmap
   const [error, setError] = useState(null);
 
   const handleSubmit = async (event) => {
@@ -24,6 +26,8 @@ const CodeCheckerForm = () => {
     setCodeSmells([]);
     setDeprecatedLibraries([]);
     setCodeClones([]);
+    setKeywordChart(''); // Reset the keyword chart
+    setCodeCloneHeatmap(''); // Reset the code clones heatmap
     setError(null);
 
     try {
@@ -36,6 +40,8 @@ const CodeCheckerForm = () => {
       setCodeSmells(response.data.code_smells || []);
       setDeprecatedLibraries(response.data.deprecated_libraries || []);
       setCodeClones(response.data.code_clones || []);
+      setKeywordChart(response.data.keyword_chart || ''); // Set the keyword chart
+      setCodeCloneHeatmap(response.data.code_clone_heatmap || ''); // Set the code clones heatmap
     } catch (err) {
       setError('There was an error checking your code. Please try again.');
     }
@@ -66,6 +72,7 @@ const CodeCheckerForm = () => {
             <p>{result}</p>
           </div>
         )}
+        
         {unusedImports.length > 0 && (
           <div className="unused-imports">
             <h3 className="section-title">Unused Imports</h3>
@@ -76,9 +83,9 @@ const CodeCheckerForm = () => {
             </ul>
           </div>
         )}
+         <h3 >Corrected Code</h3>
         {correctedCode && (
           <div className="corrected-code">
-            <h3 className="section-title">Corrected Code</h3>
             <pre>{correctedCode}</pre>
           </div>
         )}
@@ -130,6 +137,18 @@ const CodeCheckerForm = () => {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+        {keywordChart && (
+          <div className="keyword-chart">
+            <h3 className="section-title">Keyword Distribution</h3>
+            <img src={`data:image/png;base64,${keywordChart}`} alt="Keyword Distribution Chart" />
+          </div>
+        )}
+        {codeCloneHeatmap && (
+          <div className="code-clone-heatmap">
+            <h3 className="section-title">Code Clones Heatmap</h3>
+            <img src={`data:image/png;base64,${codeCloneHeatmap}`} alt="Code Clones Heatmap" />
           </div>
         )}
         {error && (

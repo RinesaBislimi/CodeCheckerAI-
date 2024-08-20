@@ -14,7 +14,10 @@ from rest_framework.response import Response
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 import matplotlib.pyplot as plt
+from io import BytesIO 
 import logging
+import seaborn as sns
+
 
 import io
 import base64
@@ -43,20 +46,20 @@ class CodeCheckView(APIView):
         Attempts to correct common syntax errors in the provided code.
         """
         correction_message = None
-        max_iterations = 10  
+        max_iterations = 10
 
         for _ in range(max_iterations):
             try:
                 ast.parse(code)
-                return code, correction_message  
+                return code, correction_message
             except SyntaxError as e:
                 lines = code.split('\n')
-                error_line_number = e.lineno - 1  
+                error_line_number = e.lineno - 1
                 error_line = lines[error_line_number]
 
                 new_correction_message = None
 
-               
+                # Fix: Missing closing parenthesis
                 if error_line.count('(') > error_line.count(')'):
                     lines[error_line_number] = error_line + ')'
                     new_correction_message = "Added missing closing parenthesis."
@@ -106,10 +109,67 @@ class CodeCheckView(APIView):
                     return code, f"Syntax Error: {e}"
 
                 code = '\n'.join(lines)
-                correction_message = (correction_message or "") + " " + new_correction_message
+                correction_message = (correction_message or "") + " " + (new_correction_message or "")
 
-        # If maximum iterations are reached, return the current state of the code
         return code, correction_message or "Reached maximum iterations, some errors might still be present."
+
+    def visualize_keyword_distribution(self, keyword_data):
+        """
+        Generate a bar chart visualization of keyword distribution with increased spacing between bars.
+        """
+        labels = keyword_data['labels']
+        data = keyword_data['data']
+
+        fig, ax = plt.subplots(figsize=(14, 8))  # Increased figure size for better spacing
+        bars = ax.bar(labels, data, width=0.6)  # Adjust the width of the bars
+
+        ax.set_xlabel('Keywords')
+        ax.set_ylabel('Frequency')
+        ax.set_title('Keyword Distribution')
+
+        # Add space between bars
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=45, ha='right')  # Rotate labels for better readability
+
+        # Save the plot to a BytesIO object
+        buffer = BytesIO()
+        plt.tight_layout()  # Adjust layout to prevent clipping
+        plt.savefig(buffer, format='png')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        buffer.close()
+        plt.close(fig)
+
+        return image_base64
+
+    def visualize_code_clones_heatmap(self, code_clones):
+        """
+        Generate a heatmap visualization of code clone similarities.
+        """
+        snippets = [clone['snippet1'] for clone in code_clones] + [clone['snippet2'] for clone in code_clones]
+        similarity_matrix = np.zeros((len(snippets), len(snippets)))
+
+        for i, clone1 in enumerate(code_clones):
+            for j, clone2 in enumerate(code_clones):
+                similarity_matrix[i, j] = clone1['similarity'] if i == j else clone2['similarity']
+
+        # Create a heatmap
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(similarity_matrix, annot=True, cmap='YlGnBu', fmt='.2f', ax=ax)
+        plt.title('Code Clones Similarity Heatmap')
+        plt.xlabel('Code Snippets')
+        plt.ylabel('Code Snippets')
+        plt.tight_layout()
+
+        # Save and return the heatmap as an image
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        buffer.close()
+        plt.close(fig)
+
+        return image_base64
 
     def post(self, request, *args, **kwargs):
         serializer = CodeSnippetSerializer(data=request.data)
@@ -124,11 +184,9 @@ class CodeCheckView(APIView):
                 ast.parse(corrected_code)
             except SyntaxError as e:
                 return Response({"result": f"Syntax Error: {e}"}, status=status.HTTP_200_OK)
-            
+
             # List unused imports
             unused_imports = find_unused_imports(corrected_code)
-
-            # Now remove unused imports from the corrected code
             corrected_code = remove_unused_imports(corrected_code)
 
             # Analyze the code using various functions
@@ -139,22 +197,28 @@ class CodeCheckView(APIView):
             deprecated_libraries = detect_deprecated_libraries(corrected_code)
             clusters = detect_code_clusters([corrected_code, corrected_code])
 
+            # Prepare data for visualization
+            keyword_distribution = analyze_code(corrected_code, 'keyword_distribution')
+            keyword_chart = self.visualize_keyword_distribution(keyword_distribution)
+            code_clone_heatmap = self.visualize_code_clones_heatmap(code_clones)
+
             response_data = {
                 "result": correction_message if correction_message else "No syntax errors detected.",
-                "unused_imports": unused_imports,  # Listing unused imports
-                "corrected_code": corrected_code,  # Now includes both syntax corrections and removal of unused imports
+                "unused_imports": unused_imports,
+                "corrected_code": corrected_code,
                 "anomaly_detection_result": anomaly_detection_result,
                 "keywords": keywords,
                 "code_smells": code_smells,
                 "deprecated_libraries": deprecated_libraries,
                 "code_clones": code_clones,
                 "clusters": clusters,
+                "keyword_chart": keyword_chart,  # Base64 image data for keyword distribution visualization
+                "code_clone_heatmap": code_clone_heatmap,  # Base64 image data for code clones heatmap visualization
             }
 
             return Response(response_data, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     
 
 class CodeAnalysisView(APIView):

@@ -48,7 +48,7 @@
 }
 
 .section-title {
-  color: #dfd7d7;
+  color: #080707;
   margin-bottom: 10px;
 }
 
@@ -70,4 +70,17 @@
 .error-message {
   color: red;
   margin-top: 20px;
+}
+
+
+
+.keyword-chart {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.keyword-chart img {
+  max-width: 100%; /* Adjusts the image to fit within its container */
+  height: auto; /* Maintains aspect ratio */
+  border: 1px solid #ccc; /* Optional: adds a border around the chart */
 }
