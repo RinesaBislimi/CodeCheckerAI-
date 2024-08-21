@@ -17,7 +17,9 @@ import matplotlib.pyplot as plt
 from io import BytesIO 
 import logging
 import seaborn as sns
-
+from sklearn.svm import OneClassSVM
+from sklearn.cluster import KMeans
+import shap 
 import io
 import base64
 import numpy as np
@@ -259,7 +261,10 @@ class GithubRepoAnalysisView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
-        
+    
+
+
+
 class DatasetCheckView(APIView):
     def post(self, request):
         file = request.FILES.get('file')
@@ -271,17 +276,17 @@ class DatasetCheckView(APIView):
             numeric_features = df.select_dtypes(include=[np.number])
             if numeric_features.empty:
                 return Response({'error': 'Dataset does not contain numeric features.'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
             features = numeric_features.values
-            
+
             iso_forest_data = self.detect_anomalies_with_iso_forest(features)
             svm_data = self.detect_anomalies_with_svm(features)
             cluster_graph = self.perform_clustering(features)
-            
+
             return Response({
                 **iso_forest_data,
                 **svm_data,
-                'cluster_graph': cluster_graph
+                'cluster_graph': cluster_graph,
             })
 
         except pd.errors.EmptyDataError:
@@ -297,12 +302,36 @@ class DatasetCheckView(APIView):
         predictions = model.predict(features)
         anomalies = np.where(predictions == -1)[0]
         explanations = [f'Anomaly detected at index {i}' for i in anomalies]
-        
+
+        # SHAP explanation
+        shap_data = self.explain_anomalies_with_shap(model, features)
+
         return {
             'num_iso_forest_anomalies': len(anomalies),
             'iso_forest_anomalies': anomalies.tolist(),
             'iso_forest_explanations': explanations,
-            'iso_forest_graph': self.generate_anomaly_graph(features, anomalies, 'Isolation Forest')
+            'iso_forest_graph': self.generate_anomaly_graph(features, anomalies, 'Isolation Forest'),
+            **shap_data
+        }
+
+    def explain_anomalies_with_shap(self, model, features):
+        # Use KernelExplainer for model-agnostic explanation
+        explainer = shap.KernelExplainer(lambda x: model.predict(x), features)
+        shap_values = explainer.shap_values(features)
+
+        # SHAP summary plot
+        plt.figure()
+        shap.summary_plot(shap_values, features, plot_type="bar", show=False)
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+        buf.close()
+        plt.close()
+
+        return {
+            'shap_summary_plot': img_str
         }
 
     def detect_anomalies_with_svm(self, features):
@@ -311,7 +340,7 @@ class DatasetCheckView(APIView):
         predictions = model.predict(features)
         anomalies = np.where(predictions == -1)[0]
         explanations = [f'Anomaly detected at index {i}' for i in anomalies]
-        
+
         return {
             'num_svm_anomalies': len(anomalies),
             'svm_anomalies': anomalies.tolist(),
@@ -322,21 +351,21 @@ class DatasetCheckView(APIView):
     def perform_clustering(self, features):
         model = KMeans(n_clusters=3)
         cluster_labels = model.fit_predict(features)
-        
+
         plt.figure(figsize=(10, 6))
         scatter = plt.scatter(features[:, 0], features[:, 1], c=cluster_labels, cmap='viridis')
         plt.colorbar(scatter, label='Cluster Label')
         plt.title('KMeans Clustering')
         plt.xlabel('Feature 1')
         plt.ylabel('Feature 2')
-        
+
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
         img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
         buf.close()
         plt.close()
-        
+
         return img_str
 
     def generate_anomaly_graph(self, features, anomalies, model_name):
@@ -348,12 +377,12 @@ class DatasetCheckView(APIView):
         plt.ylabel('Feature Value')
         plt.legend()
         plt.grid(True)
-        
+
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
         img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
         buf.close()
         plt.close()
-        
+
         return img_str

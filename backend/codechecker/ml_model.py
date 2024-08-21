@@ -15,7 +15,6 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
-from dotenv import load_dotenv
 import os
 
 
