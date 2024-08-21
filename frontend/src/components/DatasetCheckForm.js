@@ -82,6 +82,7 @@ const DatasetCheckForm = () => {
             <p>
               <strong>Explanations (One-Class SVM):</strong> {result.svm_explanations ? result.svm_explanations.join(' | ') : 'N/A'}
             </p>
+
             {result.iso_forest_graph && (
               <div className="anomaly-graph">
                 <h3>Isolation Forest Anomaly Graph</h3>
@@ -103,6 +104,14 @@ const DatasetCheckForm = () => {
                 <Tooltip />
               </div>
             )}
+{result.shap_summary_plot && (
+  <div className="shap-results">
+    <h3>SHAP Summary Plot</h3>
+    <img src={`data:image/png;base64,${result.shap_summary_plot}`} alt="SHAP Summary Plot" data-tip="SHAP Summary Plot" />
+    <Tooltip />
+  </div>
+)}
+
           </div>
         )}
         {error && (
