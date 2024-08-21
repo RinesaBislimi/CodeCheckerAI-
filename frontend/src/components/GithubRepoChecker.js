@@ -72,6 +72,14 @@ const GithubRepoChecker = () => {
           ) : (
             <p>No vulnerabilities detected.</p>
           )}
+
+          {/* Display the commit chart */}
+          {result.commit_chart && (
+            <div className="commit-chart">
+              <h3 className="section-title">Commits per Day:</h3>
+              <img src={`data:image/png;base64,${result.commit_chart}`} alt="Commits per Day Chart" />
+            </div>
+          )}
         </div>
       )}
       {error && <div className="error-message"><p>{error}</p></div>}

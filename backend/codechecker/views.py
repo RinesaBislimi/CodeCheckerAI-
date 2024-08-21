@@ -17,8 +17,9 @@ import matplotlib.pyplot as plt
 from io import BytesIO 
 import logging
 import seaborn as sns
-
-
+from django.shortcuts import render
+from django.http import JsonResponse
+import os
 import io
 import base64
 import numpy as np
@@ -33,7 +34,9 @@ from .ml_model import (
     extract_keywords_from_code,
     detect_code_smells,
     detect_deprecated_libraries,
-    detect_anomalies
+    detect_anomalies,
+    fetch_commits,
+    count_commits_per_day,visualize_commit_counts
 )
 from .utils import find_unused_imports, remove_unused_imports  
 from .serializers import CodeSnippetSerializer
@@ -230,6 +233,8 @@ class CodeAnalysisView(APIView):
         analysis_results = analyze_code(code, visualization_type)
         return Response(analysis_results, status=status.HTTP_200_OK)
 
+
+
 class GithubRepoAnalysisView(APIView):
     permission_classes = [AllowAny]
 
@@ -241,18 +246,84 @@ class GithubRepoAnalysisView(APIView):
             analysis_results = analyze_code_contents(code_contents)  # Analyze code
             security_vulnerabilities = detect_security_vulnerabilities(code_contents)  # Detect vulnerabilities
             
+            # Fetch and visualize commits
+            commits = fetch_commits(repo_url)
+            commit_counts = count_commits_per_day(commits)
+            commit_chart = visualize_commit_counts(commit_counts)
+            
             return Response({
                 'repository': repo_info,
                 'analysis_results': analysis_results,
                 'security_vulnerabilities': security_vulnerabilities,
+                'commit_chart': commit_chart,  # Adding commit chart to the response
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
         
+
+
+def commit_activity_view(request):
+    """
+    View to display commit activity and visualize commits.
+    """
+    repo_url = "owner/repo"  # Replace with your GitHub repo URL
+
+    try:
+        # Fetch commits from GitHub
+        commits = fetch_commits(repo_url)
         
+        # Count commits per day
+        commit_counts = count_commits_per_day(commits)
         
+        # Visualize commit counts
+        plot_data = visualize_commit_counts(commit_counts)
+        
+        context = {
+            'plot_data': plot_data,
+        }
+        
+        return render(request, 'commit_activity.html', context)
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+def check_repo(request):
+    """
+    API view to handle repository checking and provide commit chart data.
+    """
+    if request.method == 'POST':
+        repo_url = request.data.get('repo_url', '')
+
+        try:
+            # Fetch commits from GitHub
+            commits = fetch_commits(repo_url)
+            
+            # Process commits and generate chart
+            # Assume these functions are defined elsewhere
+            commit_counts = count_commits_per_day(commits)
+            plot_data = visualize_commit_counts(commit_counts)
+            
+            response_data = {
+                'repository': {
+                    'repository': repo_url,
+                    'name': 'Repo Name',  # Placeholder, fetch actual repo name if needed
+                    'owner': 'Repo Owner',  # Placeholder, fetch actual repo owner if needed
+                    'description': 'Repo Description',  # Placeholder, fetch actual repo description if needed
+                    'stars': 0,  # Placeholder, fetch actual star count if needed
+                    'forks': 0,  # Placeholder, fetch actual fork count if needed
+                },
+                'analysis_results': {},  # Include actual analysis results if applicable
+                'security_vulnerabilities': [],  # Include actual vulnerabilities if applicable
+                'commit_chart': plot_data  # Base64 encoded commit chart image
+            }
+
+            return JsonResponse(response_data)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    
 class DatasetCheckView(APIView):
     def post(self, request):
         file = request.FILES.get('file')
