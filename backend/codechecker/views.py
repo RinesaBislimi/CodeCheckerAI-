@@ -18,11 +18,6 @@ from io import BytesIO
 import logging
 import seaborn as sns
 
-from sklearn.svm import OneClassSVM
-from sklearn.cluster import KMeans
-from sklearn.ensemble import RandomForestClassifier
-
-
 import io
 import base64
 import numpy as np
@@ -37,7 +32,9 @@ from .ml_model import (
     extract_keywords_from_code,
     detect_code_smells,
     detect_deprecated_libraries,
-    detect_anomalies
+    detect_anomalies,
+    fetch_commits,
+    count_commits_per_day,visualize_commit_counts
 )
 from .utils import find_unused_imports, remove_unused_imports  
 from .serializers import CodeSnippetSerializer
@@ -234,6 +231,8 @@ class CodeAnalysisView(APIView):
         analysis_results = analyze_code(code, visualization_type)
         return Response(analysis_results, status=status.HTTP_200_OK)
 
+
+
 class GithubRepoAnalysisView(APIView):
     permission_classes = [AllowAny]
 
@@ -245,18 +244,22 @@ class GithubRepoAnalysisView(APIView):
             analysis_results = analyze_code_contents(code_contents)  # Analyze code
             security_vulnerabilities = detect_security_vulnerabilities(code_contents)  # Detect vulnerabilities
             
+            # Fetch and visualize commits
+            commits = fetch_commits(repo_url)
+            commit_counts = count_commits_per_day(commits)
+            commit_chart = visualize_commit_counts(commit_counts)
+            
             return Response({
                 'repository': repo_info,
                 'analysis_results': analysis_results,
                 'security_vulnerabilities': security_vulnerabilities,
+                'commit_chart': commit_chart,  # Adding commit chart to the response
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
         
-        
-
 class DatasetCheckView(APIView):
     def post(self, request):
         file = request.FILES.get('file')

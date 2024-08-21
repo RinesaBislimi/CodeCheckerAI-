@@ -10,6 +10,14 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from collections import Counter
 from .utils import remove_unused_imports
+from datetime import datetime, timedelta
+from collections import defaultdict
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+from dotenv import load_dotenv
+import os
+
 
 def preprocess_code_for_analysis(code):
     """
@@ -317,3 +325,61 @@ def detect_code_clones(code_snippets):
                     'similarity': similarity_matrix[i, j]
                 })
     return clones
+
+def fetch_commits(repo_url):
+    """
+    Fetch commits from the provided GitHub repository URL.
+    """
+    # Remove the 'https://github.com/' part to get the repo in 'owner/repo' format
+    if repo_url.startswith('https://github.com/'):
+        repo_path = repo_url[len('https://github.com/'):]
+    else:
+        raise ValueError('Invalid GitHub repository URL')
+
+    # Construct the API URL to fetch commits
+    api_url = f'https://api.github.com/repos/{repo_path}/commits'
+    
+    response = requests.get(api_url)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise ValueError(f"Error fetching commits: {response.status_code} Client Error")
+
+def count_commits_per_day(commits):
+    """
+    Count the number of commits per day from a list of commit data.
+    """
+    commit_dates = [commit['commit']['committer']['date'][:10] for commit in commits]
+    date_counts = defaultdict(int)
+    
+    for date in commit_dates:
+        date_counts[date] += 1
+    
+    return dict(date_counts)
+
+def visualize_commit_counts(commit_counts):
+    """
+    Visualize the number of commits per day.
+    """
+    if not commit_counts:
+        return None
+    
+    dates = list(commit_counts.keys())
+    counts = list(commit_counts.values())
+    
+    plt.figure(figsize=(10, 6))
+    plt.bar(dates, counts)
+    plt.xlabel('Date')
+    plt.ylabel('Number of Commits')
+    plt.title('Number of Commits per Day')
+    plt.xticks(rotation=45)
+    
+    # Save plot to a BytesIO object and encode as base64
+    buffer = BytesIO()
+    plt.savefig(buffer, format='png')
+    plt.close()
+    buffer.seek(0)
+    plot_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    return plot_data
