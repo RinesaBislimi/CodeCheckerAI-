@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import './DatasetCheckForm.css';
+import { Tooltip } from 'react-tooltip';
 
 const DatasetCheckForm = () => {
   const [file, setFile] = useState(null);
@@ -50,7 +51,9 @@ const DatasetCheckForm = () => {
             type="file"
             accept=".csv"
             onChange={handleFileChange}
+            data-tip="Upload your CSV file here"
           />
+          <Tooltip />
           <br />
           <button className="submit-button" type="submit" disabled={loading}>
             {loading ? 'Checking...' : 'Check Dataset'}
@@ -61,26 +64,43 @@ const DatasetCheckForm = () => {
         {result && (
           <div className="result">
             <h2>Results</h2>
-            <p><strong>Number of Anomalies:</strong> {result.num_anomalies}</p>
-            <p><strong>Anomalies:</strong> {result.anomalies.join(', ')}</p>
-            {result.anomalous_rows && (
-              <div className="anomalous-rows">
-                <h3>Anomalous Rows</h3>
-                <ul>
-                  {result.anomalous_rows.map((row, idx) => (
-                    <li key={idx}>
-                      <strong>Row {row.index}:</strong> {JSON.stringify(row.row)}
-                      <br />
-                      <strong>Explanation:</strong> {JSON.stringify(row.explanation)}
-                    </li>
-                  ))}
-                </ul>
+            <p>
+              <strong>Number of Anomalies (Isolation Forest):</strong> {result.num_iso_forest_anomalies || 'N/A'}
+            </p>
+            <p>
+              <strong>Anomalies (Isolation Forest):</strong> {result.iso_forest_anomalies ? result.iso_forest_anomalies.join(', ') : 'N/A'}
+            </p>
+            <p>
+              <strong>Explanations (Isolation Forest):</strong> {result.iso_forest_explanations ? result.iso_forest_explanations.join(' | ') : 'N/A'}
+            </p>
+            <p>
+              <strong>Number of Anomalies (One-Class SVM):</strong> {result.num_svm_anomalies || 'N/A'}
+            </p>
+            <p>
+              <strong>Anomalies (One-Class SVM):</strong> {result.svm_anomalies ? result.svm_anomalies.join(', ') : 'N/A'}
+            </p>
+            <p>
+              <strong>Explanations (One-Class SVM):</strong> {result.svm_explanations ? result.svm_explanations.join(' | ') : 'N/A'}
+            </p>
+            {result.iso_forest_graph && (
+              <div className="anomaly-graph">
+                <h3>Isolation Forest Anomaly Graph</h3>
+                <img src={`data:image/png;base64,${result.iso_forest_graph}`} alt="Isolation Forest Anomaly Graph" data-tip="Isolation Forest Anomaly Graph" />
+                <Tooltip />
               </div>
             )}
-            {result.anomaly_graph && (
+            {result.svm_graph && (
               <div className="anomaly-graph">
-                <h3>Anomaly Graph</h3>
-                <img src={`data:image/png;base64,${result.anomaly_graph}`} alt="Anomaly Graph" />
+                <h3>One-Class SVM Anomaly Graph</h3>
+                <img src={`data:image/png;base64,${result.svm_graph}`} alt="One-Class SVM Anomaly Graph" data-tip="One-Class SVM Anomaly Graph" />
+                <Tooltip />
+              </div>
+            )}
+            {result.cluster_graph && (
+              <div className="cluster-graph">
+                <h3>KMeans Clustering</h3>
+                <img src={`data:image/png;base64,${result.cluster_graph}`} alt="KMeans Clustering" data-tip="KMeans Clustering" />
+                <Tooltip />
               </div>
             )}
           </div>

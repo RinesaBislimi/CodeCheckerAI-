@@ -18,6 +18,10 @@ from io import BytesIO
 import logging
 import seaborn as sns
 
+from sklearn.svm import OneClassSVM
+from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
+
 
 import io
 import base64
@@ -252,7 +256,7 @@ class GithubRepoAnalysisView(APIView):
         
         
         
-        
+
 class DatasetCheckView(APIView):
     def post(self, request):
         file = request.FILES.get('file')
@@ -260,51 +264,93 @@ class DatasetCheckView(APIView):
             return Response({'error': 'No file uploaded.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Load dataset into a DataFrame
             df = pd.read_csv(file)
-
-            # Check for numeric features
             numeric_features = df.select_dtypes(include=[np.number])
             if numeric_features.empty:
-                return Response({'error': 'Dataset does not contain numeric features for anomaly detection.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Dataset does not contain numeric features.'}, status=status.HTTP_400_BAD_REQUEST)
             
             features = numeric_features.values
             
-            # Anomaly detection using Isolation Forest
-            model = IsolationForest(contamination=0.1)
-            model.fit(features)
-            predictions = model.predict(features)
-            
-            # Identify anomalies
-            anomalies = np.where(predictions == -1)[0]
-            num_anomalies = len(anomalies)
-            
-            # Generate a graph
-            plt.figure(figsize=(10, 6))
-            plt.scatter(range(len(features)), features[:, 0], c='blue', label='Normal')
-            plt.scatter(anomalies, features[anomalies, 0], c='red', label='Anomaly')
-            plt.title('Anomaly Detection')
-            plt.xlabel('Index')
-            plt.ylabel('Feature Value')
-            plt.legend()
-            plt.grid(True)
-            
-            # Save plot to a BytesIO object
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png')
-            buf.seek(0)
-            img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
-            buf.close()
+            iso_forest_data = self.detect_anomalies_with_iso_forest(features)
+            svm_data = self.detect_anomalies_with_svm(features)
+            cluster_graph = self.perform_clustering(features)
             
             return Response({
-                'num_anomalies': num_anomalies,
-                'anomalies': anomalies.tolist(),
-                'anomaly_graph': img_str  # Include the base64-encoded image here
+                **iso_forest_data,
+                **svm_data,
+                'cluster_graph': cluster_graph
             })
 
         except pd.errors.EmptyDataError:
             return Response({'error': 'Uploaded file is empty. Please upload a non-empty CSV file.'}, status=status.HTTP_400_BAD_REQUEST)
         except pd.errors.ParserError:
-            return Response({'error': 'Error parsing the file. Please ensure the file is a valid CSV format.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Error parsing the file. Ensure it is a valid CSV format.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({'error': f'An unexpected error occurred: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def detect_anomalies_with_iso_forest(self, features):
+        model = IsolationForest(contamination=0.1)
+        model.fit(features)
+        predictions = model.predict(features)
+        anomalies = np.where(predictions == -1)[0]
+        explanations = [f'Anomaly detected at index {i}' for i in anomalies]
+        
+        return {
+            'num_iso_forest_anomalies': len(anomalies),
+            'iso_forest_anomalies': anomalies.tolist(),
+            'iso_forest_explanations': explanations,
+            'iso_forest_graph': self.generate_anomaly_graph(features, anomalies, 'Isolation Forest')
+        }
+
+    def detect_anomalies_with_svm(self, features):
+        model = OneClassSVM(nu=0.1, kernel="rbf", gamma=0.1)
+        model.fit(features)
+        predictions = model.predict(features)
+        anomalies = np.where(predictions == -1)[0]
+        explanations = [f'Anomaly detected at index {i}' for i in anomalies]
+        
+        return {
+            'num_svm_anomalies': len(anomalies),
+            'svm_anomalies': anomalies.tolist(),
+            'svm_explanations': explanations,
+            'svm_graph': self.generate_anomaly_graph(features, anomalies, 'One-Class SVM')
+        }
+
+    def perform_clustering(self, features):
+        model = KMeans(n_clusters=3)
+        cluster_labels = model.fit_predict(features)
+        
+        plt.figure(figsize=(10, 6))
+        scatter = plt.scatter(features[:, 0], features[:, 1], c=cluster_labels, cmap='viridis')
+        plt.colorbar(scatter, label='Cluster Label')
+        plt.title('KMeans Clustering')
+        plt.xlabel('Feature 1')
+        plt.ylabel('Feature 2')
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+        buf.close()
+        plt.close()
+        
+        return img_str
+
+    def generate_anomaly_graph(self, features, anomalies, model_name):
+        plt.figure(figsize=(10, 6))
+        plt.scatter(range(len(features)), features[:, 0], c='blue', label='Normal')
+        plt.scatter(anomalies, features[anomalies, 0], c='red', label='Anomaly')
+        plt.title(f'{model_name} Anomaly Detection')
+        plt.xlabel('Index')
+        plt.ylabel('Feature Value')
+        plt.legend()
+        plt.grid(True)
+        
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+        buf.close()
+        plt.close()
+        
+        return img_str
