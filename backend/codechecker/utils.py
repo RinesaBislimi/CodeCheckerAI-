@@ -45,7 +45,6 @@ def remove_unused_imports(code):
     try:
         tree = ast.parse(code)
         
-        # Collect all import names
         all_imports = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -55,19 +54,16 @@ def remove_unused_imports(code):
                 for alias in node.names:
                     all_imports.append(alias.name.split('.')[0])
         
-        # Collect all used names
         used_names = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Name):
                 used_names.add(node.id)
         
-        # Determine which imports are used
         used_imports = set()
         for name in all_imports:
             if name in used_names:
                 used_imports.add(name)
 
-        # Generate a new code string with only used imports
         new_code_lines = []
         lines = code.splitlines()
         inside_import_block = False
@@ -75,7 +71,6 @@ def remove_unused_imports(code):
         for line in lines:
             if line.strip().startswith("import") or line.strip().startswith("from"):
                 inside_import_block = True
-                # Check if the import is used
                 import_name = line.split()[1].split('.')[0]
                 if import_name in used_imports:
                     new_code_lines.append(line)

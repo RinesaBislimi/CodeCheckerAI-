@@ -62,28 +62,23 @@ class CodeCheckView(APIView):
 
                 new_correction_message = None
 
-                # Fix: Missing closing parenthesis
                 if error_line.count('(') > error_line.count(')'):
                     lines[error_line_number] = error_line + ')'
                     new_correction_message = "Added missing closing parenthesis."
 
-                # Fix: Missing closing bracket
                 elif error_line.count('[') > error_line.count(']'):
                     lines[error_line_number] = error_line + ']'
                     new_correction_message = "Added missing closing bracket."
 
-                # Fix: Missing closing brace
                 elif error_line.count('{') > error_line.count('}'):
                     lines[error_line_number] = error_line + '}'
                     new_correction_message = "Added missing closing brace."
 
-                # Fix: Missing colon at the end of control structures
                 elif any(error_line.strip().startswith(keyword) for keyword in ('if', 'elif', 'else', 'for', 'while', 'def', 'class')):
                     if not error_line.strip().endswith(':'):
                         lines[error_line_number] = error_line + ':'
                         new_correction_message = "Added missing colon at the end of the statement."
 
-                # Fix: Missing quotation mark (double or single)
                 elif error_line.count('"') % 2 != 0:
                     lines[error_line_number] = error_line + '"'
                     new_correction_message = "Added missing double quotation mark."
@@ -91,24 +86,20 @@ class CodeCheckView(APIView):
                     lines[error_line_number] = error_line + "'"
                     new_correction_message = "Added missing single quotation mark."
 
-                # Fix: Indentation errors
                 elif 'expected an indented block' in str(e):
                     indentation_level = len(error_line) - len(error_line.lstrip())
                     lines.insert(error_line_number + 1, ' ' * (indentation_level + 4) + 'pass')
                     new_correction_message = "Added 'pass' statement to fix indentation."
 
-                # Fix: Unexpected EOF while parsing
                 elif 'unexpected EOF while parsing' in str(e):
                     lines[error_line_number] = error_line + '\npass'
                     new_correction_message = "Added 'pass' to complete the statement."
 
-                # Fix: Assignments without expressions
                 elif 'cannot assign to' in str(e) and error_line.strip().endswith('='):
                     lines[error_line_number] = error_line + ' None'
                     new_correction_message = "Added 'None' to complete the assignment."
 
                 else:
-                    # If no automatic fix can be applied, return the original code with an error message
                     return code, f"Syntax Error: {e}"
 
                 code = '\n'.join(lines)
@@ -123,20 +114,18 @@ class CodeCheckView(APIView):
         labels = keyword_data['labels']
         data = keyword_data['data']
 
-        fig, ax = plt.subplots(figsize=(14, 8))  # Increased figure size for better spacing
-        bars = ax.bar(labels, data, width=0.6)  # Adjust the width of the bars
+        fig, ax = plt.subplots(figsize=(14, 8)) 
+        bars = ax.bar(labels, data, width=0.6)  
 
         ax.set_xlabel('Keywords')
         ax.set_ylabel('Frequency')
         ax.set_title('Keyword Distribution')
 
-        # Add space between bars
         ax.set_xticks(range(len(labels)))
-        ax.set_xticklabels(labels, rotation=45, ha='right')  # Rotate labels for better readability
+        ax.set_xticklabels(labels, rotation=45, ha='right') 
 
-        # Save the plot to a BytesIO object
         buffer = BytesIO()
-        plt.tight_layout()  # Adjust layout to prevent clipping
+        plt.tight_layout()  
         plt.savefig(buffer, format='png')
         buffer.seek(0)
         image_base64 = base64.b64encode(buffer.getvalue()).decode()
@@ -156,7 +145,6 @@ class CodeCheckView(APIView):
             for j, clone2 in enumerate(code_clones):
                 similarity_matrix[i, j] = clone1['similarity'] if i == j else clone2['similarity']
 
-        # Create a heatmap
         fig, ax = plt.subplots(figsize=(10, 8))
         sns.heatmap(similarity_matrix, annot=True, cmap='YlGnBu', fmt='.2f', ax=ax)
         plt.title('Code Clones Similarity Heatmap')
@@ -164,7 +152,6 @@ class CodeCheckView(APIView):
         plt.ylabel('Code Snippets')
         plt.tight_layout()
 
-        # Save and return the heatmap as an image
         buffer = BytesIO()
         plt.savefig(buffer, format='png')
         buffer.seek(0)
@@ -179,20 +166,16 @@ class CodeCheckView(APIView):
         if serializer.is_valid():
             code = serializer.validated_data.get("code")
 
-            # Correct syntax errors if possible
             corrected_code, correction_message = self.correct_syntax_errors(code)
 
-            # Check for remaining syntax errors after correction
             try:
                 ast.parse(corrected_code)
             except SyntaxError as e:
                 return Response({"result": f"Syntax Error: {e}"}, status=status.HTTP_200_OK)
 
-            # List unused imports
             unused_imports = find_unused_imports(corrected_code)
             corrected_code = remove_unused_imports(corrected_code)
 
-            # Analyze the code using various functions
             anomaly_detection_result = detect_anomalies([corrected_code])
             code_clones = detect_code_clones([corrected_code, corrected_code])
             keywords = extract_keywords_from_code(corrected_code)
@@ -200,7 +183,6 @@ class CodeCheckView(APIView):
             deprecated_libraries = detect_deprecated_libraries(corrected_code)
             clusters = detect_code_clusters([corrected_code, corrected_code])
 
-            # Prepare data for visualization
             keyword_distribution = analyze_code(corrected_code, 'keyword_distribution')
             keyword_chart = self.visualize_keyword_distribution(keyword_distribution)
             code_clone_heatmap = self.visualize_code_clones_heatmap(code_clones)
@@ -215,8 +197,8 @@ class CodeCheckView(APIView):
                 "deprecated_libraries": deprecated_libraries,
                 "code_clones": code_clones,
                 "clusters": clusters,
-                "keyword_chart": keyword_chart,  # Base64 image data for keyword distribution visualization
-                "code_clone_heatmap": code_clone_heatmap,  # Base64 image data for code clones heatmap visualization
+                "keyword_chart": keyword_chart,  
+                "code_clone_heatmap": code_clone_heatmap,  
             }
 
             return Response(response_data, status=status.HTTP_200_OK)
@@ -241,12 +223,11 @@ class GithubRepoAnalysisView(APIView):
     def post(self, request):
         repo_url = request.data.get('repo_url', '')
         try:
-            repo_info = analyze_github_repo(repo_url)  # Basic repo info
-            code_contents = fetch_repo_contents(repo_url)  # Fetch code files
-            analysis_results = analyze_code_contents(code_contents)  # Analyze code
-            security_vulnerabilities = detect_security_vulnerabilities(code_contents)  # Detect vulnerabilities
+            repo_info = analyze_github_repo(repo_url)  
+            code_contents = fetch_repo_contents(repo_url)  
+            analysis_results = analyze_code_contents(code_contents) 
+            security_vulnerabilities = detect_security_vulnerabilities(code_contents) 
             
-            # Fetch and visualize commits
             commits = fetch_commits(repo_url)
             commit_counts = count_commits_per_day(commits)
             commit_chart = visualize_commit_counts(commit_counts)
@@ -255,7 +236,7 @@ class GithubRepoAnalysisView(APIView):
                 'repository': repo_info,
                 'analysis_results': analysis_results,
                 'security_vulnerabilities': security_vulnerabilities,
-                'commit_chart': commit_chart,  # Adding commit chart to the response
+                'commit_chart': commit_chart,  
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -303,7 +284,6 @@ class DatasetCheckView(APIView):
         anomalies = np.where(predictions == -1)[0]
         explanations = [f'Anomaly detected at index {i}' for i in anomalies]
 
-        # SHAP explanation
         shap_data = self.explain_anomalies_with_shap(model, features)
 
         return {
@@ -315,11 +295,9 @@ class DatasetCheckView(APIView):
         }
 
     def explain_anomalies_with_shap(self, model, features):
-        # Use KernelExplainer for model-agnostic explanation
         explainer = shap.KernelExplainer(lambda x: model.predict(x), features)
         shap_values = explainer.shap_values(features)
 
-        # SHAP summary plot
         plt.figure()
         shap.summary_plot(shap_values, features, plot_type="bar", show=False)
 

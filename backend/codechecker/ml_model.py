@@ -31,11 +31,9 @@ def analyze_code_snippets(code_snippets):
     """
     cleaned_snippets = [preprocess_code_for_analysis(code) for code in code_snippets]
     
-    # Proceed with the rest of your analysis using cleaned_snippets
     features = [extract_features_from_code(code) for code in cleaned_snippets]
     features = np.array(features)
     
-    # Example anomaly detection
     model = IsolationForest(contamination=0.1)
     model.fit(features)
     
@@ -62,7 +60,6 @@ def detect_code_clusters(code_snippets, n_clusters=5):
     features = [extract_features_from_code(code) for code in code_snippets]
     features = np.array(features)
     
-    # Ensure that the number of clusters is not greater than the number of samples
     n_clusters = min(n_clusters, len(code_snippets))
     
     if n_clusters < 1:
@@ -79,16 +76,6 @@ def detect_code_clusters(code_snippets, n_clusters=5):
         'cluster_centers': cluster_centers,
     }
 
-# def detect_anomalies_with_svm(code_snippets):
-#     features = [extract_features_from_code(code) for code in code_snippets]
-#     features = np.array(features)
-    
-#     model = OneClassSVM(nu=0.1, kernel='rbf', gamma='auto')
-#     model.fit(features)
-    
-#     anomalies = model.predict(features)
-    
-#     return [code_snippets[i] for i, anomaly in enumerate(anomalies) if anomaly == -1]
 
 def compute_code_embeddings(code_snippets):
     """
@@ -292,7 +279,6 @@ def detect_anomalies(user_code):
     if isinstance(user_code, list):
         user_code = '\n'.join(user_code)
     
-    # Ensure that user_code is a string
     if not isinstance(user_code, str):
         raise TypeError("user_code should be a string or a list of strings.")
     
@@ -329,13 +315,11 @@ def fetch_commits(repo_url):
     """
     Fetch commits from the provided GitHub repository URL.
     """
-    # Remove the 'https://github.com/' part to get the repo in 'owner/repo' format
     if repo_url.startswith('https://github.com/'):
         repo_path = repo_url[len('https://github.com/'):]
     else:
         raise ValueError('Invalid GitHub repository URL')
 
-    # Construct the API URL to fetch commits
     api_url = f'https://api.github.com/repos/{repo_path}/commits'
     
     response = requests.get(api_url)
@@ -374,7 +358,6 @@ def visualize_commit_counts(commit_counts):
     plt.title('Number of Commits per Day')
     plt.xticks(rotation=45)
     
-    # Save plot to a BytesIO object and encode as base64
     buffer = BytesIO()
     plt.savefig(buffer, format='png')
     plt.close()

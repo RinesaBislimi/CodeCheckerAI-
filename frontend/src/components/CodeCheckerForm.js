@@ -12,8 +12,8 @@ const CodeCheckerForm = () => {
   const [codeSmells, setCodeSmells] = useState([]);
   const [deprecatedLibraries, setDeprecatedLibraries] = useState([]);
   const [codeClones, setCodeClones] = useState([]);
-  const [keywordChart, setKeywordChart] = useState(''); // New state for the keyword chart
-  const [codeCloneHeatmap, setCodeCloneHeatmap] = useState(''); // New state for the code clones heatmap
+  const [keywordChart, setKeywordChart] = useState(''); 
+  const [codeCloneHeatmap, setCodeCloneHeatmap] = useState(''); 
   const [error, setError] = useState(null);
 
   const handleSubmit = async (event) => {
@@ -26,8 +26,8 @@ const CodeCheckerForm = () => {
     setCodeSmells([]);
     setDeprecatedLibraries([]);
     setCodeClones([]);
-    setKeywordChart(''); // Reset the keyword chart
-    setCodeCloneHeatmap(''); // Reset the code clones heatmap
+    setKeywordChart(''); 
+    setCodeCloneHeatmap(''); 
     setError(null);
 
     try {
@@ -40,8 +40,8 @@ const CodeCheckerForm = () => {
       setCodeSmells(response.data.code_smells || []);
       setDeprecatedLibraries(response.data.deprecated_libraries || []);
       setCodeClones(response.data.code_clones || []);
-      setKeywordChart(response.data.keyword_chart || ''); // Set the keyword chart
-      setCodeCloneHeatmap(response.data.code_clone_heatmap || ''); // Set the code clones heatmap
+      setKeywordChart(response.data.keyword_chart || ''); 
+      setCodeCloneHeatmap(response.data.code_clone_heatmap || ''); 
     } catch (err) {
       setError('There was an error checking your code. Please try again.');
     }
